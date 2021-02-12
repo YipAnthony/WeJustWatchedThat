@@ -1,7 +1,8 @@
 var express = require('express');
 var router = express.Router();
-const VotingSession = require('../models/VotingSession')
+const ActiveSession = require('../models/ActiveSessions')
 const User = require('../models/User')
+const fetch = require('node-fetch');
 
 function randomString(length = 4) {  
   let result           = '';
@@ -13,9 +14,31 @@ function randomString(length = 4) {
   return result;
 }
 
+router.post('/', async (req, res, next) => {
+  const { genres, providers, timeframe } = req.body
+
+  let requestURL = "https://api.themoviedb.org/3/discover/movie?sort_by=popularity.desc&watch_region=US"
+                  + `&primary_release_date.gte=${timeframe}`
+                  + `&with_watch_providers=${providers}`
+                  + `&with_genres=${genres}`
+
+  console.log(requestURL)
+
+  let fetchResults = await fetch (requestURL, {
+    method: "GET",
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + process.env.THEMOVIEDB_BEARER,
+    },
+  })
+  let results = await fetchResults.json()
+  console.log(results)
+  res.json(results)
+})
+
 /* POST session: creates a new session */
 // this endpoint will be called when user clicks "create sharing link"
-router.post('/', function(req, res, next) {
+router.post('/create', function(req, res, next) {
 
   //get movie results array from post body 
   const movieResults = req.body.movieResults 
@@ -27,7 +50,7 @@ router.post('/', function(req, res, next) {
       if (err) throw err;
 
 
-      const newSession = new VotingSession({
+      const newSession = new ActiveSession({
         name: `${user.displayName}'s Session`,
         creator: currentUser._id,
         password: randomString(),
@@ -62,7 +85,7 @@ router.get('/voted', (req, res, next) => {
 router.get('/:id', (req, res, next) => {
   if (req.isAuthenticated()) {
 
-    VotingSession.findById(req.params.id, (err, session) => {
+    ActiveSession.findById(req.params.id, (err, session) => {
       if (err) { return next(err) }
       
       //
